@@ -1,618 +1,519 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Indoor Navigation - Draw Hallways</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floor Plan Pathfinder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; }
-        
-        .header {
+        body { font-family: 'Inter', sans-serif; }
+        #canvas-container {
+            position: relative;
+            background-image: url('blueprint.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            margin: auto;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #graph-canvas {
             position: absolute;
             top: 0;
             left: 0;
-            right: 0;
-            z-index: 1000;
-            background: white;
-            padding: 15px 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .header h1 {
-            font-size: 18px;
-            color: #2196F3;
-            margin-bottom: 10px;
-        }
-        
-        .search-box {
-            position: relative;
-        }
-        
-        .search-box input {
             width: 100%;
-            max-width: 500px;
-            padding: 10px 80px 10px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 15px;
-        }
-        
-        .search-box input:focus {
-            outline: none;
-            border-color: #2196F3;
-        }
-        
-        .search-box button {
-            position: absolute;
-            right: 5px;
-            top: 5px;
-            padding: 6px 15px;
-            background: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        
-        .suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            max-width: 500px;
-            background: white;
-            border: 2px solid #e0e0e0;
-            border-top: none;
-            border-radius: 0 0 6px 6px;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-        }
-        
-        .suggestion {
-            padding: 10px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .suggestion:hover {
-            background: #f5f5f5;
-        }
-        
-        #map {
-            position: absolute;
-            top: 85px;
-            left: 0;
-            right: 0;
-            bottom: 0;
-        }
-        
-        .btn-group {
-            position: absolute;
-            top: 95px;
-            right: 10px;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
-        .control-btn {
-            padding: 10px 15px;
-            background: white;
-            border: 2px solid #2196F3;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            color: #2196F3;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            font-size: 13px;
-        }
-        
-        .control-btn:hover {
-            background: #2196F3;
-            color: white;
-        }
-        
-        .btn-draw {
-            border-color: #FF9800;
-            color: #FF9800;
-        }
-        
-        .btn-draw:hover {
-            background: #FF9800;
-        }
-        
-        .btn-draw.active {
-            background: #FF9800;
-            color: white;
-        }
-        
-        .btn-undo {
-            border-color: #9C27B0;
-            color: #9C27B0;
-        }
-        
-        .btn-undo:hover {
-            background: #9C27B0;
-            color: white;
-        }
-        
-        .btn-finish {
-            border-color: #4CAF50;
-            color: #4CAF50;
-        }
-        
-        .btn-finish:hover {
-            background: #4CAF50;
-            color: white;
-        }
-        
-        .btn-clear {
-            border-color: #f44336;
-            color: #f44336;
-        }
-        
-        .btn-clear:hover {
-            background: #f44336;
-            color: white;
-        }
-        
-        .info-panel {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            max-width: 300px;
-            display: none;
-            z-index: 1000;
-        }
-        
-        .info-panel.show {
-            display: block;
-        }
-        
-        .info-panel h3 {
-            color: #2196F3;
-            margin-bottom: 8px;
-        }
-        
-        .info-panel button {
-            margin-top: 10px;
-            padding: 8px 15px;
-            background: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            width: 100%;
-        }
-        
-        .info-panel button:hover {
-            background: #1976D2;
-        }
-        
-        .btn-close {
-            background: #757575 !important;
-            margin-top: 5px;
-        }
-        
-        .draw-status {
-            position: absolute;
-            top: 95px;
-            left: 20px;
-            z-index: 1000;
-            background: #FF9800;
-            color: white;
-            padding: 10px 15px;
-            border-radius: 6px;
-            font-weight: bold;
-            display: none;
+            height: 100%;
         }
     </style>
 </head>
-<body>
-    <div class="header">
-        <h1>🗺️ Draw Your Hallways - Click and Drag!</h1>
-        <div class="search-box">
-            <input 
-                type="text" 
-                id="searchInput" 
-                placeholder="Search location..."
-                autocomplete="off"
-            >
-            <button onclick="search()">🔍 Search</button>
-            <div class="suggestions" id="suggestions"></div>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">Find Your Way</h1>
+
+        <!-- Control Panel -->
+        <div class="flex flex-col md:flex-row justify-center items-center gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+            <!-- Start Location -->
+            <div class="flex-1 w-full">
+                <label for="start-select" class="block text-sm font-medium text-gray-700 mb-1">Start Location</label>
+                <select id="start-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Select starting point...</option>
+                </select>
+            </div>
+
+            <!-- End Location -->
+            <div class="flex-1 w-full">
+                <label for="end-select" class="block text-sm font-medium text-gray-700 mb-1">End Location</label>
+                <select id="end-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Select destination...</option>
+                </select>
+            </div>
+
+            <!-- Find Path Button -->
+            <button id="find-path-btn" class="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-md font-medium transition-all hover:bg-blue-700 mt-2 md:mt-6">
+                Find Path
+            </button>
+        </div>
+
+        <!-- Instructions -->
+        <div id="instructions" class="text-center text-gray-600 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md" style="display: none;">
+            <p id="instruction-text"></p>
+        </div>
+
+        <!-- Canvas Container -->
+        <div id="canvas-container" class="w-full max-w-5xl mx-auto">
+            <canvas id="graph-canvas"></canvas>
         </div>
     </div>
-    
-    <div class="draw-status" id="drawStatus">
-        🖊️ DRAWING MODE - Click and drag to draw hallways
-    </div>
-    
-    <div class="btn-group">
-        <button class="control-btn" onclick="setCurrentLocation()">
-            📍 Set My Location
-        </button>
-        <button class="control-btn btn-draw" id="drawBtn" onclick="toggleDrawMode()">
-            🖊️ Draw Hallways
-        </button>
-        <button class="control-btn btn-undo" onclick="undoLastPath()">
-            ↩️ Undo Last Path
-        </button>
-        <button class="control-btn btn-clear" onclick="clearHallways()">
-            🗑️ Clear All
-        </button>
-        <button class="control-btn btn-finish" onclick="finishDrawing()">
-            ✅ Finish (<span id="pathCount">0</span>)
-        </button>
-    </div>
-    
-    <div id="map"></div>
-    
-    <div class="info-panel" id="infoPanel">
-        <h3 id="locationName">Location</h3>
-        <p id="locationDesc">Description</p>
-        <button onclick="navigateTo()">🧭 Navigate Here</button>
-        <button class="btn-close" onclick="closeInfo()">Close</button>
-    </div>
-    
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <script>
-        const locations = {
-            'Main Entrance': {
-                pos: [820, 1695],
-                door: [1112, 1685],
-                description: 'Main building entrance'
-            },
-            'Conference Room': {
-                pos: [1992, 1955],
-                door: [1907, 2113],
-                description: 'Meeting and conference space'
-            },
-            'Computer Lab': {
-                pos: [1192, 3195],
-                door: [1069, 3106],
-                description: 'Computer lab with workstations'
-            },
-            'Study Area': {
-                pos: [696, 3243],
-                door: [808, 3094],
-                description: 'Quiet study space'
-            }
-        };
-        
-        const map = L.map('map', { 
-            crs: L.CRS.Simple,
-            minZoom: -2,
-            maxZoom: 4,
-            zoom: 0
-        });
-        
-        const bounds = [[0, 0], [3024, 4032]];
-        L.imageOverlay('blueprint.png', bounds).addTo(map);
-        map.fitBounds(bounds);
-        
-        let markers = {};
-        let selectedLocation = null;
-        let currentLocation = null;
-        let currentLocationMarker = null;
-        let routeLine = null;
-        let isDrawing = false;
-        let drawingMode = false;
-        let currentDrawingLine = null;
-        let drawnLines = [];
-        let corridorWaypoints = [];
-        
-        Object.entries(locations).forEach(([name, data]) => {
-            const marker = L.marker(data.pos).addTo(map);
-            marker.bindPopup(`<b>${name}</b><br>${data.description}`);
-            marker.on('click', () => {
-                if (!drawingMode) showInfo(name, data);
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('graph-canvas');
+            const ctx = canvas.getContext('2d');
+            const container = document.getElementById('canvas-container');
+
+            // --- UI ---
+            const startSelect = document.getElementById('start-select');
+            const endSelect = document.getElementById('end-select');
+            const findPathBtn = document.getElementById('find-path-btn');
+            const instructionText = document.getElementById('instruction-text');
+            const instructions = document.getElementById('instructions');
+
+            // --- App State ---
+            let nodes = []; // Array of { id, x, y, name }
+            let edges = []; // Array of { from, to } (using node IDs)
+            let shortestPath = []; // Array of points {x, y} to draw
+            const NODE_RADIUS = 8;
+            
+            const backgroundImage = new Image();
+            backgroundImage.src = 'blueprint.png';
+
+            // --- Initialization ---
+            backgroundImage.onload = () => {
+                container.style.aspectRatio = `${backgroundImage.naturalWidth} / ${backgroundImage.naturalHeight}`;
+                resizeCanvas();
+                loadGraph(); // Load graph data *after* canvas is ready
+            };
+
+            // --- Event Listeners ---
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                draw(); // Redraw everything
             });
-            markers[name] = marker;
-            
-            L.circleMarker(data.door, {
-                radius: 5,
-                fillColor: '#4CAF50',
-                color: 'white',
-                weight: 2,
-                fillOpacity: 0.8
-            }).addTo(map).bindPopup(`🚪 Door to ${name}`);
-        });
-        
-        function toggleDrawMode() {
-            drawingMode = !drawingMode;
-            const btn = document.getElementById('drawBtn');
-            const status = document.getElementById('drawStatus');
-            
-            if (drawingMode) {
-                btn.classList.add('active');
-                status.style.display = 'block';
-                map.dragging.disable();
-            } else {
-                btn.classList.remove('active');
-                status.style.display = 'none';
-                map.dragging.enable();
+            findPathBtn.addEventListener('click', handleFindPath);
+
+            // --- Core Functions ---
+
+            function resizeCanvas() {
+                const rect = container.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
             }
-        }
-        
-        map.on('mousedown', function(e) {
-            if (!drawingMode) return;
-            
-            isDrawing = true;
-            const startPoint = [e.latlng.lat, e.latlng.lng];
-            
-            currentDrawingLine = L.polyline([startPoint], {
-                color: '#FF9800',
-                weight: 8,
-                opacity: 0.7
-            }).addTo(map);
-        });
-        
-        map.on('mousemove', function(e) {
-            if (!isDrawing || !currentDrawingLine) return;
-            
-            const newPoint = [e.latlng.lat, e.latlng.lng];
-            const latlngs = currentDrawingLine.getLatLngs();
-            latlngs.push(newPoint);
-            currentDrawingLine.setLatLngs(latlngs);
-        });
-        
-        map.on('mouseup', function(e) {
-            if (!isDrawing) return;
-            
-            isDrawing = false;
-            
-            if (currentDrawingLine) {
-                const points = currentDrawingLine.getLatLngs();
+
+            function loadGraph() {
+                try {
+                    const graphDataString = localStorage.getItem('floorPlanGraph');
+                    if (graphDataString) {
+                        const graphData = JSON.parse(graphDataString);
+                        nodes = graphData.nodes || [];
+                        edges = graphData.edges || [];
+                        
+                        populateDropdowns();
+                        draw(); // Draw initial nodes
+                    } else {
+                        showError("No pathfinding data found. Please contact an administrator.");
+                    }
+                } catch (e) {
+                    console.error("Failed to load graph:", e);
+                    showError("Error loading pathfinding data.");
+                }
+            }
+
+            function populateDropdowns() {
+                startSelect.innerHTML = '<option value="">Select starting point...</option>';
+                endSelect.innerHTML = '<option value="">Select destination...</option>';
+
+                // Filter nodes that are 'room' type, have a name, and sort them
+                const namedNodes = nodes
+                    .filter(node => node.type === 'room' && node.name && node.name.trim() !== "")
+                    .sort((a, b) => a.name.localeCompare(b.name));
+
+                namedNodes.forEach(node => {
+                    const option = `<option value="${node.id}">${node.name}</option>`;
+                    startSelect.innerHTML += option;
+                    endSelect.innerHTML += option;
+                });
+            }
+
+            function handleFindPath() {
+                const startNodeId = parseInt(startSelect.value, 10);
+                const endNodeId = parseInt(endSelect.value, 10);
+
+                if (isNaN(startNodeId) || isNaN(endNodeId)) {
+                    showError("Please select both a start and end location.");
+                    return;
+                }
+
+                if (startNodeId === endNodeId) {
+                    showError("Start and end locations cannot be the same.");
+                    return;
+                }
                 
-                if (points.length > 2) {
-                    drawnLines.push(currentDrawingLine);
-                    updatePathCount();
-                    console.log(`Path ${drawnLines.length} drawn with ${points.length} points`);
+                hideError();
+                
+                const startNode = nodes.find(n => n.id === startNodeId);
+                const endNode = nodes.find(n => n.id === endNodeId);
+
+                if (!startNode || !endNode) {
+                    showError("Selected location data not found.");
+                    return;
+                }
+
+                calculateShortestPath(startNode, endNode);
+                
+                // Show descriptions if path is found
+                if (shortestPath.length > 0) {
+                    let startDesc = startNode.description ? ` (${startNode.description})` : '';
+                    let endDesc = endNode.description ? ` (${endNode.description})` : '';
+                    let message = `Path found from <b>${startNode.name}</b>${startDesc} to <b>${endNode.name}</b>${endDesc}.`;
+                    showMessage(message, 'info');
+                }
+                
+                draw();
+            }
+
+            function showError(message) {
+                instructionText.innerHTML = message;
+                instructions.style.display = 'block';
+                instructions.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-700');
+                instructions.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
+            }
+            
+            function showMessage(message, type = 'info') {
+                instructionText.innerHTML = message;
+                instructions.style.display = 'block';
+                
+                instructions.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-700', 'bg-red-50', 'border-red-200', 'text-red-700');
+                
+                if (type === 'error') {
+                    instructions.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
                 } else {
-                    map.removeLayer(currentDrawingLine);
+                    instructions.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
+                }
+            }
+
+            function hideError() {
+                instructions.style.display = 'none';
+                instructionText.textContent = '';
+                instructions.classList.add('bg-blue-50', 'border-blue-200');
+                instructions.classList.remove('bg-red-50', 'border-red-200', 'text-red-700');
+                instructions.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
+            }
+
+            // --- Pathfinding Functions ---
+
+            class PriorityQueue {
+                constructor() { this.items = []; }
+                enqueue(element, priority) {
+                    this.items.push({ element, priority });
+                    this.items.sort((a, b) => a.priority - b.priority);
+                }
+                dequeue() { return this.items.shift(); }
+                isEmpty() { return this.items.length === 0; }
+            }
+
+            function dist(p1, p2) {
+                return Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
+            }
+
+            /**
+             * Gets the closest point on a line segment to point p
+             */
+            function getClosestPointOnSegment(p, p1, p2) {
+                const px = p.x, py = p.y;
+                const x1 = p1.x, y1 = p1.y;
+                const x2 = p2.x, y2 = p2.y;
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const lenSq = dx * dx + dy * dy;
+                if (lenSq === 0) return { x: x1, y: y1 }; // segment is a point
+                const t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+                if (t < 0) return { x: x1, y: y1 }; // beyond p1
+                if (t > 1) return { x: x2, y: y2 }; // beyond p2
+                return { x: x1 + t * dx, y: y1 + t * dy };
+            }
+
+            /**
+             * Finds the closest point on the *corridor graph* to a given node.
+             */
+            function findClosestGraphPoint(node, corridorEdges, corridorNodes) {
+                if (corridorEdges.length === 0) return null;
+
+                let minDistance = Infinity;
+                let bestPoint = null;
+                let bestEdge = null;
+
+                for (const edge of corridorEdges) {
+                    const nodeA = corridorNodes.find(n => n.id === edge.from);
+                    const nodeB = corridorNodes.find(n => n.id === edge.to);
+                    if (!nodeA || !nodeB) continue;
+
+                    const closestPointOnEdge = getClosestPointOnSegment(node, nodeA, nodeB);
+                    const d = dist(node, closestPointOnEdge);
+
+                    if (d < minDistance) {
+                        minDistance = d;
+                        bestPoint = closestPointOnEdge;
+                        bestEdge = edge;
+                    }
+                }
+                return { point: bestPoint, edge: bestEdge, distance: minDistance };
+            }
+
+            /**
+             * Helper to add an undirected edge to an adjacency map
+             */
+            function addTempEdge(map, id1, id2, weight) {
+                map.get(id1).push({ id: id2, weight });
+                map.get(id2).push({ id: id1, weight });
+            }
+
+            /**
+             * Helper to remove an undirected edge from an adjacency map
+             */
+            function removeTempEdge(map, id1, id2) {
+                map.set(id1, map.get(id1).filter(edge => edge.id !== id2));
+                map.set(id2, map.get(id2).filter(edge => edge.id !== id1));
+            }
+
+            /**
+             * Builds the base adjacency list and coordinate map for Dijkstra's
+             */
+            function buildWeightedEdgeList(corridorNodes, corridorEdges) {
+                const graphEdges = new Map(); // Adjacency list: nodeId -> [{ id, weight }]
+                const nodeCoords = new Map(); // nodeId -> {x, y}
+
+                corridorNodes.forEach(node => {
+                    graphEdges.set(node.id, []);
+                    nodeCoords.set(node.id, { x: node.x, y: node.y });
+                });
+
+                corridorEdges.forEach(edge => {
+                    const nodeA = nodeCoords.get(edge.from);
+                    const nodeB = nodeCoords.get(edge.to);
+                    if(nodeA && nodeB) {
+                        const weight = dist(nodeA, nodeB);
+                        addTempEdge(graphEdges, edge.from, edge.to, weight);
+                    }
+                });
+
+                return { graphEdges, nodeCoords };
+            }
+
+            /**
+             * Runs Dijkstra's algorithm
+             */
+            function dijkstra(graphEdges, nodeCoords, startNodeId, endNodeId) {
+                const distances = new Map();
+                const previous = new Map();
+                const pq = new PriorityQueue();
+                
+                nodeCoords.forEach((_, id) => {
+                    distances.set(id, Infinity);
+                    previous.set(id, null);
+                });
+
+                distances.set(startNodeId, 0);
+                pq.enqueue(startNodeId, 0);
+
+                while (!pq.isEmpty()) {
+                    const { element: currentNodeId } = pq.dequeue();
+                    
+                    if (currentNodeId === endNodeId) break; // Path found
+
+                    if (!graphEdges.has(currentNodeId)) continue;
+
+                    graphEdges.get(currentNodeId).forEach(neighbor => {
+                        const newDist = distances.get(currentNodeId) + neighbor.weight;
+                        if (newDist < distances.get(neighbor.id)) {
+                            distances.set(neighbor.id, newDist);
+                            previous.set(neighbor.id, currentNodeId);
+                            pq.enqueue(neighbor.id, newDist);
+                        }
+                    });
+                }
+
+                // Reconstruct path
+                const path = [];
+                let current = endNodeId;
+                while (current !== null) {
+                    path.unshift(current);
+                    if (!previous.has(current)) break;
+                    current = previous.get(current);
                 }
                 
-                currentDrawingLine = null;
+                return (path[0] === startNodeId) ? path : []; // Return path or empty array
+            }
+
+
+            function calculateShortestPath(startNode, endNode) {
+                // 1. Filter graph to only corridor nodes and edges
+                const corridorNodes = nodes.filter(n => n.type === 'corridor');
+                const corridorNodeIds = new Set(corridorNodes.map(n => n.id));
+                const corridorEdges = edges.filter(e => 
+                    corridorNodeIds.has(e.from) && corridorNodeIds.has(e.to)
+                );
+
+                if (corridorEdges.length === 0) {
+                    showError("No corridor path network has been defined by the admin.");
+                    shortestPath = [];
+                    return;
+                }
+
+                // 2. Build base graph from corridor
+                const { graphEdges, nodeCoords } = buildWeightedEdgeList(corridorNodes, corridorEdges);
+
+                // 3. Find projection points for start/end rooms onto the corridor graph
+                const startProj = findClosestGraphPoint(startNode, corridorEdges, corridorNodes);
+                const endProj = findClosestGraphPoint(endNode, corridorEdges, corridorNodes);
+
+                if (!startProj || !endProj) {
+                     showError("Could not find a connection to the corridor network.");
+                     shortestPath = [];
+                     return;
+                }
+
+                const tempStartNodeId = -1; // Temp ID for start projection
+                const tempEndNodeId = -2; // Temp ID for end projection
+                
+                // 4. Modify the graph temporarily to include projection points
+
+                // Handle Start Projection
+                const { edge: startEdge, point: pStart } = startProj;
+                const startA_id = startEdge.from;
+                const startB_id = startEdge.to;
+                removeTempEdge(graphEdges, startA_id, startB_id); // Remove original edge
+                graphEdges.set(tempStartNodeId, []);
+                nodeCoords.set(tempStartNodeId, pStart);
+                // Add new edges from projection point to old edge's ends
+                addTempEdge(graphEdges, startA_id, tempStartNodeId, dist(nodeCoords.get(startA_id), pStart));
+                addTempEdge(graphEdges, startB_id, tempStartNodeId, dist(nodeCoords.get(startB_id), pStart));
+
+                // Handle End Projection
+                const { edge: endEdge, point: pEnd } = endProj;
+                const endA_id = endEdge.from;
+                const endB_id = endEdge.to;
+                
+                if (startEdge === endEdge) {
+                    // Start and End are on the same edge
+                    // We already removed this edge, so just add the end projection node
+                    graphEdges.set(tempEndNodeId, []);
+                    nodeCoords.set(tempEndNodeId, pEnd);
+                    // Add edges from end projection to original ends
+                    addTempEdge(graphEdges, endA_id, tempEndNodeId, dist(nodeCoords.get(endA_id), pEnd));
+                    addTempEdge(graphEdges, endB_id, tempEndNodeId, dist(nodeCoords.get(endB_id), pEnd));
+                    // Add edge *between* the two projection points
+                    addTempEdge(graphEdges, tempStartNodeId, tempEndNodeId, dist(pStart, pEnd));
+                } else {
+                    // Projections are on different edges
+                    removeTempEdge(graphEdges, endA_id, endB_id); // Remove original edge
+                    graphEdges.set(tempEndNodeId, []);
+                    nodeCoords.set(tempEndNodeId, pEnd);
+                    // Add new edges from projection point to old edge's ends
+                    addTempEdge(graphEdges, endA_id, tempEndNodeId, dist(nodeCoords.get(endA_id), pEnd));
+                    addTempEdge(graphEdges, endB_id, tempEndNodeId, dist(nodeCoords.get(endB_id), pEnd));
+                }
+
+                // 5. Run Dijkstra's
+                const pathNodeIds = dijkstra(graphEdges, nodeCoords, tempStartNodeId, tempEndNodeId);
+                
+                if (pathNodeIds.length === 0) {
+                     showError("A path could not be found between these locations.");
+                     shortestPath = [];
+                     return;
+                }
+                
+                // 6. Convert path IDs to points
+                const pathPoints = pathNodeIds.map(id => nodeCoords.get(id));
+
+                // 7. Set final path
+                shortestPath = [startNode, ...pathPoints, endNode];
+            }
+
+            // --- Drawing Functions ---
+
+            function draw() {
+                if (!ctx) return;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw all nodes and their names
+                drawNodes();
+
+                // Draw all graph edges faintly
+                drawEdges();
+
+                // Draw the shortest path on top
+                drawShortestPath();
+            }
+
+            function drawNodes() {
+                nodes.forEach(node => {
+                    // Green for rooms, Red for corridor junctions
+                    const color = node.type === 'room' ? '#22c55e' : '#ef4444';
+
+                    // Draw the main circle
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, NODE_RADIUS, 0, 2 * Math.PI);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#1f2937';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Draw node name
+                    ctx.fillStyle = '#1f2937';
+                    ctx.font = 'bold 14px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(node.name, node.x, node.y - NODE_RADIUS - 4);
+                });
+            }
+
+            function drawEdges() {
+                ctx.strokeStyle = '#dbeafe'; // blue-100
+                ctx.lineWidth = 2;
+                edges.forEach(edge => {
+                    const nodeFrom = nodes.find(n => n.id === edge.from);
+                    const nodeTo = nodes.find(n => n.id === edge.to);
+                    if (nodeFrom && nodeTo) {
+                        ctx.beginPath();
+                        ctx.moveTo(nodeFrom.x, nodeFrom.y);
+                        ctx.lineTo(nodeTo.x, nodeTo.y);
+                        ctx.stroke();
+                    }
+                });
+            }
+            
+            function drawShortestPath() {
+                if (shortestPath.length < 2) return;
+
+                ctx.strokeStyle = '#22c55e'; // green-500
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.setLineDash([10, 10]);
+
+                ctx.beginPath();
+                ctx.moveTo(shortestPath[0].x, shortestPath[0].y);
+                for (let i = 1; i < shortestPath.length; i++) {
+                    ctx.lineTo(shortestPath[i].x, shortestPath[i].y);
+                }
+                ctx.stroke();
+                
+                ctx.setLineDash([]); // Reset line dash
             }
         });
-        
-        function updatePathCount() {
-            const counter = document.getElementById('pathCount');
-            if (counter) {
-                counter.textContent = drawnLines.length;
-            }
-        }
-        
-        function undoLastPath() {
-            if (drawnLines.length === 0) {
-                alert('⚠️ No paths to undo!');
-                return;
-            }
-            
-            const lastLine = drawnLines.pop();
-            map.removeLayer(lastLine);
-            updatePathCount();
-            
-            console.log(`Undone! ${drawnLines.length} paths remaining`);
-        }
-        
-        function clearHallways() {
-            if (confirm('Clear all drawn hallways?')) {
-                drawnLines.forEach(line => map.removeLayer(line));
-                drawnLines = [];
-                corridorWaypoints = [];
-                updatePathCount();
-                console.log('All hallways cleared');
-            }
-        }
-        
-        function finishDrawing() {
-            if (drawnLines.length === 0) {
-                alert('⚠️ No hallways drawn yet!');
-                return;
-            }
-            
-            corridorWaypoints = [];
-            
-            drawnLines.forEach((line) => {
-                const points = line.getLatLngs();
-                
-                for (let i = 0; i < points.length; i++) {
-                    const point = points[i];
-                    corridorWaypoints.push([
-                        Math.round(point.lat),
-                        Math.round(point.lng)
-                    ]);
-                }
-            });
-            
-            corridorWaypoints = corridorWaypoints.filter((point, index, self) =>
-                index === self.findIndex(p => p[0] === point[0] && p[1] === point[1])
-            );
-            
-            console.log('\n========== HALLWAYS COMPLETE ==========');
-            console.log('Paths drawn:', drawnLines.length);
-            console.log('Waypoints generated:', corridorWaypoints.length);
-            console.log('\nCOPY THIS:\n');
-            console.log('const corridorWaypoints = ' + JSON.stringify(corridorWaypoints, null, 2) + ';');
-            console.log('\n=======================================\n');
-            
-            if (drawingMode) toggleDrawMode();
-            
-            alert(`✅ Complete!\n\n${drawnLines.length} paths\n${corridorWaypoints.length} waypoints\n\nCheck console (F12) to save.`);
-        }
-        
-        function distance(p1, p2) {
-            const dy = p2[0] - p1[0];
-            const dx = p2[1] - p1[1];
-            return Math.sqrt(dx * dx + dy * dy);
-        }
-        
-        function findSmartPath(start, destinationName) {
-            if (corridorWaypoints.length === 0) {
-                return [start, locations[destinationName].pos];
-            }
-            
-            const destination = locations[destinationName];
-            const destDoor = destination.door;
-            const destPos = destination.pos;
-            
-            const path = [start];
-            
-            let nearestToStart = corridorWaypoints[0];
-            let minDist = distance(start, nearestToStart);
-            
-            corridorWaypoints.forEach(wp => {
-                const dist = distance(start, wp);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestToStart = wp;
-                }
-            });
-            
-            path.push(nearestToStart);
-            
-            let nearestToDoor = corridorWaypoints[0];
-            minDist = distance(destDoor, nearestToDoor);
-            
-            corridorWaypoints.forEach(wp => {
-                const dist = distance(destDoor, wp);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestToDoor = wp;
-                }
-            });
-            
-            if (nearestToDoor !== nearestToStart) {
-                path.push(nearestToDoor);
-            }
-            
-            path.push(destDoor);
-            path.push(destPos);
-            
-            return path;
-        }
-        
-        const searchInput = document.getElementById('searchInput');
-        const suggestionsDiv = document.getElementById('suggestions');
-        
-        searchInput.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            if (query.length < 2) {
-                suggestionsDiv.style.display = 'none';
-                return;
-            }
-            
-            const matches = Object.keys(locations).filter(name => 
-                name.toLowerCase().includes(query)
-            );
-            
-            if (matches.length > 0) {
-                suggestionsDiv.innerHTML = matches.map(name => 
-                    `<div class="suggestion" onclick="selectLocation('${name}')">${name}</div>`
-                ).join('');
-                suggestionsDiv.style.display = 'block';
-            } else {
-                suggestionsDiv.style.display = 'none';
-            }
-        });
-        
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') search();
-        });
-        
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.search-box')) {
-                suggestionsDiv.style.display = 'none';
-            }
-        });
-        
-        function search() {
-            const query = searchInput.value.trim().toLowerCase();
-            const found = Object.keys(locations).find(name => 
-                name.toLowerCase().includes(query)
-            );
-            
-            if (found) {
-                selectLocation(found);
-            }
-        }
-        
-        function selectLocation(name) {
-            const location = locations[name];
-            map.setView(location.pos, 2);
-            markers[name].openPopup();
-            showInfo(name, location);
-            suggestionsDiv.style.display = 'none';
-            searchInput.value = name;
-            selectedLocation = { name, ...location };
-        }
-        
-        function showInfo(name, data) {
-            document.getElementById('locationName').textContent = name;
-            document.getElementById('locationDesc').textContent = data.description;
-            document.getElementById('infoPanel').classList.add('show');
-            selectedLocation = { name, ...data };
-        }
-        
-        function closeInfo() {
-            document.getElementById('infoPanel').classList.remove('show');
-        }
-        
-        function setCurrentLocation() {
-            alert('Click where you are');
-            
-            map.once('click', function(e) {
-                currentLocation = [e.latlng.lat, e.latlng.lng];
-                
-                if (currentLocationMarker) {
-                    map.removeLayer(currentLocationMarker);
-                }
-                
-                currentLocationMarker = L.circleMarker(currentLocation, {
-                    radius: 12,
-                    fillColor: '#2196F3',
-                    color: 'white',
-                    weight: 3,
-                    opacity: 1,
-                    fillOpacity: 0.9
-                }).addTo(map);
-                
-                currentLocationMarker.bindPopup('<b>📍 You are here</b>').openPopup();
-            });
-        }
-        
-        function navigateTo() {
-            if (!selectedLocation || !currentLocation) {
-                alert('Set location and select destination first!');
-                return;
-            }
-            
-            if (routeLine) {
-                map.removeLayer(routeLine);
-            }
-            
-            const smartPath = findSmartPath(currentLocation, selectedLocation.name);
-            
-            routeLine = L.polyline(smartPath, {
-                color: '#2196F3',
-                weight: 6,
-                opacity: 0.9,
-                dashArray: '15, 10'
-            }).addTo(map);
-            
-            map.fitBounds(smartPath, { padding: [80, 80], maxZoom: 2 });
-        }
-        
-        console.log('✅ Ready! Draw hallways then test navigation.');
     </script>
 </body>
 </html>
-indexdrawlabel.txt
-20 KB
