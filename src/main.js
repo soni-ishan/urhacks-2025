@@ -303,9 +303,17 @@ function calculateShortestPath(startNode, endNode) {
 function draw() {
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawEdges();
-    drawNodes();
-    drawShortestPath();
+    
+    if (shortestPath.length >= 2) {
+        // Only draw nodes and edges that are part of the shortest path
+        drawRelevantEdges();
+        drawRelevantNodes();
+        drawShortestPath();
+    } else {
+        // Draw all nodes and edges when no path is selected
+        drawEdges();
+        drawNodes();
+    }
 }
 
 function drawNodes() {
@@ -319,6 +327,29 @@ function drawNodes() {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
             ctx.fillText(node.name, node.x, node.y - NODE_RADIUS - 4);
+        }
+    });
+}
+
+function drawRelevantNodes() {
+    if (shortestPath.length < 2) return;
+    
+    // Create a Set of nodes in the shortest path for efficient lookup
+    const pathNodeIds = new Set(shortestPath.map(node => node.id));
+    
+    nodes.forEach(node => {
+        if (pathNodeIds.has(node.id)) {
+            const color = node.type === 'room' ? '#22c55e' : '#ef4444';
+            drawNode(node, color);
+            
+            // Only draw labels for room nodes
+            if (node.type === 'room') {
+                ctx.fillStyle = '#1f2937';
+                ctx.font = 'bold 14px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(node.name, node.x, node.y - NODE_RADIUS - 4);
+            }
         }
     });
 }
@@ -347,6 +378,27 @@ function drawEdges() {
             ctx.stroke();
         }
     });
+    ctx.globalAlpha = 1.0;
+}
+
+function drawRelevantEdges() {
+    if (shortestPath.length < 2) return;
+    
+    ctx.strokeStyle = '#3b82f6'; 
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.5; 
+    
+    // Only draw edges that connect nodes in the shortest path
+    for (let i = 0; i < shortestPath.length - 1; i++) {
+        const currentNode = shortestPath[i];
+        const nextNode = shortestPath[i + 1];
+        
+        ctx.beginPath();
+        ctx.moveTo(currentNode.x, currentNode.y);
+        ctx.lineTo(nextNode.x, nextNode.y);
+        ctx.stroke();
+    }
+    
     ctx.globalAlpha = 1.0;
 }
 
