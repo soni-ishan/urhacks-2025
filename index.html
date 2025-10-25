@@ -9,7 +9,8 @@
         body { font-family: 'Inter', sans-serif; }
         #canvas-container {
             position: relative;
-            background-image: url('blueprint.png');
+            /* UPDATED: Path now points to the root */
+            background-image: url('/blueprint.png');
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center;
@@ -24,40 +25,34 @@
             left: 0;
             width: 100%;
             height: 100%;
+            pointer-events: none; /* Canvas is for display only */
         }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8">
 
     <div class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow-lg">
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-4">Find Your Way</h1>
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">Find Your Way</h1>
 
-        <!-- Control Panel -->
-        <div class="flex flex-col md:flex-row justify-center items-center gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
-            <!-- Start Location -->
-            <div class="flex-1 w-full">
-                <label for="start-select" class="block text-sm font-medium text-gray-700 mb-1">Start Location</label>
-                <select id="start-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Select starting point...</option>
-                </select>
+        <!-- Pathfinding Controls -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="md:col-span-1">
+                <label for="start-node" class="block text-sm font-medium text-gray-700">Start Location</label>
+                <select id="start-node" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"></select>
             </div>
-
-            <!-- End Location -->
-            <div class="flex-1 w-full">
-                <label for="end-select" class="block text-sm font-medium text-gray-700 mb-1">End Location</label>
-                <select id="end-select" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Select destination...</option>
-                </select>
+            <div class="md:col-span-1">
+                <label for="end-node" class="block text-sm font-medium text-gray-700">End Location</label>
+                <select id="end-node" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"></select>
             </div>
-
-            <!-- Find Path Button -->
-            <button id="find-path-btn" class="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-md font-medium transition-all hover:bg-blue-700 mt-2 md:mt-6">
-                Find Path
-            </button>
+            <div class="md:col-span-1 flex items-end">
+                <button id="find-path-btn" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md font-medium transition-all hover:bg-blue-700 disabled:bg-gray-400">
+                    Find Path
+                </button>
+            </div>
         </div>
 
-        <!-- Instructions -->
-        <div id="instructions" class="text-center text-gray-600 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md" style="display: none;">
+        <!-- Instructions / Error Message -->
+        <div id="instructions" class="text-center text-gray-600 mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md" style="display: none;">
             <p id="instruction-text"></p>
         </div>
 
@@ -67,453 +62,8 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const canvas = document.getElementById('graph-canvas');
-            const ctx = canvas.getContext('2d');
-            const container = document.getElementById('canvas-container');
-
-            // --- UI ---
-            const startSelect = document.getElementById('start-select');
-            const endSelect = document.getElementById('end-select');
-            const findPathBtn = document.getElementById('find-path-btn');
-            const instructionText = document.getElementById('instruction-text');
-            const instructions = document.getElementById('instructions');
-
-            // --- App State ---
-            let nodes = []; // Array of { id, x, y, name }
-            let edges = []; // Array of { from, to } (using node IDs)
-            let shortestPath = []; // Array of points {x, y} to draw
-            const NODE_RADIUS = 8;
-            
-            const backgroundImage = new Image();
-            backgroundImage.src = 'blueprint.png';
-
-            // --- Initialization ---
-            backgroundImage.onload = () => {
-                container.style.aspectRatio = `${backgroundImage.naturalWidth} / ${backgroundImage.naturalHeight}`;
-                resizeCanvas();
-                loadGraph(); // Load graph data *after* canvas is ready
-            };
-
-            // --- Event Listeners ---
-            window.addEventListener('resize', () => {
-                resizeCanvas();
-                draw(); // Redraw everything
-            });
-            findPathBtn.addEventListener('click', handleFindPath);
-
-            // --- Core Functions ---
-
-            function resizeCanvas() {
-                const rect = container.getBoundingClientRect();
-                canvas.width = rect.width;
-                canvas.height = rect.height;
-            }
-
-            function loadGraph() {
-                try {
-                    const graphDataString = localStorage.getItem('floorPlanGraph');
-                    if (graphDataString) {
-                        const graphData = JSON.parse(graphDataString);
-                        nodes = graphData.nodes || [];
-                        edges = graphData.edges || [];
-                        
-                        populateDropdowns();
-                        draw(); // Draw initial nodes
-                    } else {
-                        showError("No pathfinding data found. Please contact an administrator.");
-                    }
-                } catch (e) {
-                    console.error("Failed to load graph:", e);
-                    showError("Error loading pathfinding data.");
-                }
-            }
-
-            function populateDropdowns() {
-                startSelect.innerHTML = '<option value="">Select starting point...</option>';
-                endSelect.innerHTML = '<option value="">Select destination...</option>';
-
-                // Filter nodes that are 'room' type, have a name, and sort them
-                const namedNodes = nodes
-                    .filter(node => node.type === 'room' && node.name && node.name.trim() !== "")
-                    .sort((a, b) => a.name.localeCompare(b.name));
-
-                namedNodes.forEach(node => {
-                    const option = `<option value="${node.id}">${node.name}</option>`;
-                    startSelect.innerHTML += option;
-                    endSelect.innerHTML += option;
-                });
-            }
-
-            function handleFindPath() {
-                const startNodeId = parseInt(startSelect.value, 10);
-                const endNodeId = parseInt(endSelect.value, 10);
-
-                if (isNaN(startNodeId) || isNaN(endNodeId)) {
-                    showError("Please select both a start and end location.");
-                    return;
-                }
-
-                if (startNodeId === endNodeId) {
-                    showError("Start and end locations cannot be the same.");
-                    return;
-                }
-                
-                hideError();
-                
-                const startNode = nodes.find(n => n.id === startNodeId);
-                const endNode = nodes.find(n => n.id === endNodeId);
-
-                if (!startNode || !endNode) {
-                    showError("Selected location data not found.");
-                    return;
-                }
-
-                calculateShortestPath(startNode, endNode);
-                
-                // Show descriptions if path is found
-                if (shortestPath.length > 0) {
-                    let startDesc = startNode.description ? ` (${startNode.description})` : '';
-                    let endDesc = endNode.description ? ` (${endNode.description})` : '';
-                    let message = `Path found from <b>${startNode.name}</b>${startDesc} to <b>${endNode.name}</b>${endDesc}.`;
-                    showMessage(message, 'info');
-                }
-                
-                draw();
-            }
-
-            function showError(message) {
-                instructionText.innerHTML = message;
-                instructions.style.display = 'block';
-                instructions.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-700');
-                instructions.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
-            }
-            
-            function showMessage(message, type = 'info') {
-                instructionText.innerHTML = message;
-                instructions.style.display = 'block';
-                
-                instructions.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-700', 'bg-red-50', 'border-red-200', 'text-red-700');
-                
-                if (type === 'error') {
-                    instructions.classList.add('bg-red-50', 'border-red-200', 'text-red-700');
-                } else {
-                    instructions.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
-                }
-            }
-
-            function hideError() {
-                instructions.style.display = 'none';
-                instructionText.textContent = '';
-                instructions.classList.add('bg-blue-50', 'border-blue-200');
-                instructions.classList.remove('bg-red-50', 'border-red-200', 'text-red-700');
-                instructions.classList.add('bg-blue-50', 'border-blue-200', 'text-blue-700');
-            }
-
-            // --- Pathfinding Functions ---
-
-            class PriorityQueue {
-                constructor() { this.items = []; }
-                enqueue(element, priority) {
-                    this.items.push({ element, priority });
-                    this.items.sort((a, b) => a.priority - b.priority);
-                }
-                dequeue() { return this.items.shift(); }
-                isEmpty() { return this.items.length === 0; }
-            }
-
-            function dist(p1, p2) {
-                return Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
-            }
-
-            /**
-             * Gets the closest point on a line segment to point p
-             */
-            function getClosestPointOnSegment(p, p1, p2) {
-                const px = p.x, py = p.y;
-                const x1 = p1.x, y1 = p1.y;
-                const x2 = p2.x, y2 = p2.y;
-                const dx = x2 - x1;
-                const dy = y2 - y1;
-                const lenSq = dx * dx + dy * dy;
-                if (lenSq === 0) return { x: x1, y: y1 }; // segment is a point
-                const t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
-                if (t < 0) return { x: x1, y: y1 }; // beyond p1
-                if (t > 1) return { x: x2, y: y2 }; // beyond p2
-                return { x: x1 + t * dx, y: y1 + t * dy };
-            }
-
-            /**
-             * Finds the closest point on the *corridor graph* to a given node.
-             */
-            function findClosestGraphPoint(node, corridorEdges, corridorNodes) {
-                if (corridorEdges.length === 0) return null;
-
-                let minDistance = Infinity;
-                let bestPoint = null;
-                let bestEdge = null;
-
-                for (const edge of corridorEdges) {
-                    const nodeA = corridorNodes.find(n => n.id === edge.from);
-                    const nodeB = corridorNodes.find(n => n.id === edge.to);
-                    if (!nodeA || !nodeB) continue;
-
-                    const closestPointOnEdge = getClosestPointOnSegment(node, nodeA, nodeB);
-                    const d = dist(node, closestPointOnEdge);
-
-                    if (d < minDistance) {
-                        minDistance = d;
-                        bestPoint = closestPointOnEdge;
-                        bestEdge = edge;
-                    }
-                }
-                return { point: bestPoint, edge: bestEdge, distance: minDistance };
-            }
-
-            /**
-             * Helper to add an undirected edge to an adjacency map
-             */
-            function addTempEdge(map, id1, id2, weight) {
-                map.get(id1).push({ id: id2, weight });
-                map.get(id2).push({ id: id1, weight });
-            }
-
-            /**
-             * Helper to remove an undirected edge from an adjacency map
-             */
-            function removeTempEdge(map, id1, id2) {
-                map.set(id1, map.get(id1).filter(edge => edge.id !== id2));
-                map.set(id2, map.get(id2).filter(edge => edge.id !== id1));
-            }
-
-            /**
-             * Builds the base adjacency list and coordinate map for Dijkstra's
-             */
-            function buildWeightedEdgeList(corridorNodes, corridorEdges) {
-                const graphEdges = new Map(); // Adjacency list: nodeId -> [{ id, weight }]
-                const nodeCoords = new Map(); // nodeId -> {x, y}
-
-                corridorNodes.forEach(node => {
-                    graphEdges.set(node.id, []);
-                    nodeCoords.set(node.id, { x: node.x, y: node.y });
-                });
-
-                corridorEdges.forEach(edge => {
-                    const nodeA = nodeCoords.get(edge.from);
-                    const nodeB = nodeCoords.get(edge.to);
-                    if(nodeA && nodeB) {
-                        const weight = dist(nodeA, nodeB);
-                        addTempEdge(graphEdges, edge.from, edge.to, weight);
-                    }
-                });
-
-                return { graphEdges, nodeCoords };
-            }
-
-            /**
-             * Runs Dijkstra's algorithm
-             */
-            function dijkstra(graphEdges, nodeCoords, startNodeId, endNodeId) {
-                const distances = new Map();
-                const previous = new Map();
-                const pq = new PriorityQueue();
-                
-                nodeCoords.forEach((_, id) => {
-                    distances.set(id, Infinity);
-                    previous.set(id, null);
-                });
-
-                distances.set(startNodeId, 0);
-                pq.enqueue(startNodeId, 0);
-
-                while (!pq.isEmpty()) {
-                    const { element: currentNodeId } = pq.dequeue();
-                    
-                    if (currentNodeId === endNodeId) break; // Path found
-
-                    if (!graphEdges.has(currentNodeId)) continue;
-
-                    graphEdges.get(currentNodeId).forEach(neighbor => {
-                        const newDist = distances.get(currentNodeId) + neighbor.weight;
-                        if (newDist < distances.get(neighbor.id)) {
-                            distances.set(neighbor.id, newDist);
-                            previous.set(neighbor.id, currentNodeId);
-                            pq.enqueue(neighbor.id, newDist);
-                        }
-                    });
-                }
-
-                // Reconstruct path
-                const path = [];
-                let current = endNodeId;
-                while (current !== null) {
-                    path.unshift(current);
-                    if (!previous.has(current)) break;
-                    current = previous.get(current);
-                }
-                
-                return (path[0] === startNodeId) ? path : []; // Return path or empty array
-            }
-
-
-            function calculateShortestPath(startNode, endNode) {
-                // 1. Filter graph to only corridor nodes and edges
-                const corridorNodes = nodes.filter(n => n.type === 'corridor');
-                const corridorNodeIds = new Set(corridorNodes.map(n => n.id));
-                const corridorEdges = edges.filter(e => 
-                    corridorNodeIds.has(e.from) && corridorNodeIds.has(e.to)
-                );
-
-                if (corridorEdges.length === 0) {
-                    showError("No corridor path network has been defined by the admin.");
-                    shortestPath = [];
-                    return;
-                }
-
-                // 2. Build base graph from corridor
-                const { graphEdges, nodeCoords } = buildWeightedEdgeList(corridorNodes, corridorEdges);
-
-                // 3. Find projection points for start/end rooms onto the corridor graph
-                const startProj = findClosestGraphPoint(startNode, corridorEdges, corridorNodes);
-                const endProj = findClosestGraphPoint(endNode, corridorEdges, corridorNodes);
-
-                if (!startProj || !endProj) {
-                     showError("Could not find a connection to the corridor network.");
-                     shortestPath = [];
-                     return;
-                }
-
-                const tempStartNodeId = -1; // Temp ID for start projection
-                const tempEndNodeId = -2; // Temp ID for end projection
-                
-                // 4. Modify the graph temporarily to include projection points
-
-                // Handle Start Projection
-                const { edge: startEdge, point: pStart } = startProj;
-                const startA_id = startEdge.from;
-                const startB_id = startEdge.to;
-                removeTempEdge(graphEdges, startA_id, startB_id); // Remove original edge
-                graphEdges.set(tempStartNodeId, []);
-                nodeCoords.set(tempStartNodeId, pStart);
-                // Add new edges from projection point to old edge's ends
-                addTempEdge(graphEdges, startA_id, tempStartNodeId, dist(nodeCoords.get(startA_id), pStart));
-                addTempEdge(graphEdges, startB_id, tempStartNodeId, dist(nodeCoords.get(startB_id), pStart));
-
-                // Handle End Projection
-                const { edge: endEdge, point: pEnd } = endProj;
-                const endA_id = endEdge.from;
-                const endB_id = endEdge.to;
-                
-                if (startEdge === endEdge) {
-                    // Start and End are on the same edge
-                    // We already removed this edge, so just add the end projection node
-                    graphEdges.set(tempEndNodeId, []);
-                    nodeCoords.set(tempEndNodeId, pEnd);
-                    // Add edges from end projection to original ends
-                    addTempEdge(graphEdges, endA_id, tempEndNodeId, dist(nodeCoords.get(endA_id), pEnd));
-                    addTempEdge(graphEdges, endB_id, tempEndNodeId, dist(nodeCoords.get(endB_id), pEnd));
-                    // Add edge *between* the two projection points
-                    addTempEdge(graphEdges, tempStartNodeId, tempEndNodeId, dist(pStart, pEnd));
-                } else {
-                    // Projections are on different edges
-                    removeTempEdge(graphEdges, endA_id, endB_id); // Remove original edge
-                    graphEdges.set(tempEndNodeId, []);
-                    nodeCoords.set(tempEndNodeId, pEnd);
-                    // Add new edges from projection point to old edge's ends
-                    addTempEdge(graphEdges, endA_id, tempEndNodeId, dist(nodeCoords.get(endA_id), pEnd));
-                    addTempEdge(graphEdges, endB_id, tempEndNodeId, dist(nodeCoords.get(endB_id), pEnd));
-                }
-
-                // 5. Run Dijkstra's
-                const pathNodeIds = dijkstra(graphEdges, nodeCoords, tempStartNodeId, tempEndNodeId);
-                
-                if (pathNodeIds.length === 0) {
-                     showError("A path could not be found between these locations.");
-                     shortestPath = [];
-                     return;
-                }
-                
-                // 6. Convert path IDs to points
-                const pathPoints = pathNodeIds.map(id => nodeCoords.get(id));
-
-                // 7. Set final path
-                shortestPath = [startNode, ...pathPoints, endNode];
-            }
-
-            // --- Drawing Functions ---
-
-            function draw() {
-                if (!ctx) return;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw all nodes and their names
-                drawNodes();
-
-                // Draw all graph edges faintly
-                drawEdges();
-
-                // Draw the shortest path on top
-                drawShortestPath();
-            }
-
-            function drawNodes() {
-                nodes.forEach(node => {
-                    // Green for rooms, Red for corridor junctions
-                    const color = node.type === 'room' ? '#22c55e' : '#ef4444';
-
-                    // Draw the main circle
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, NODE_RADIUS, 0, 2 * Math.PI);
-                    ctx.fillStyle = color;
-                    ctx.fill();
-                    ctx.strokeStyle = '#1f2937';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-
-                    // Draw node name
-                    ctx.fillStyle = '#1f2937';
-                    ctx.font = 'bold 14px Inter';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'bottom';
-                    ctx.fillText(node.name, node.x, node.y - NODE_RADIUS - 4);
-                });
-            }
-
-            function drawEdges() {
-                ctx.strokeStyle = '#dbeafe'; // blue-100
-                ctx.lineWidth = 2;
-                edges.forEach(edge => {
-                    const nodeFrom = nodes.find(n => n.id === edge.from);
-                    const nodeTo = nodes.find(n => n.id === edge.to);
-                    if (nodeFrom && nodeTo) {
-                        ctx.beginPath();
-                        ctx.moveTo(nodeFrom.x, nodeFrom.y);
-                        ctx.lineTo(nodeTo.x, nodeTo.y);
-                        ctx.stroke();
-                    }
-                });
-            }
-            
-            function drawShortestPath() {
-                if (shortestPath.length < 2) return;
-
-                ctx.strokeStyle = '#22c55e'; // green-500
-                ctx.lineWidth = 6;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.setLineDash([10, 10]);
-
-                ctx.beginPath();
-                ctx.moveTo(shortestPath[0].x, shortestPath[0].y);
-                for (let i = 1; i < shortestPath.length; i++) {
-                    ctx.lineTo(shortestPath[i].x, shortestPath[i].y);
-                }
-                ctx.stroke();
-                
-                ctx.setLineDash([]); // Reset line dash
-            }
-        });
-    </script>
+    <!-- NEW: All JS is now loaded from an external module -->
+    <script type="module" src="/src/main.js"></script>
 </body>
 </html>
+
