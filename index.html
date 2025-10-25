@@ -1,41 +1,258 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Indoor Navigation System</title>
-    
-    <!-- External CSS -->
+    <title>Indoor Navigation - Draw Hallways</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; }
+        
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            color: #2196F3;
+            margin-bottom: 10px;
+        }
+        
+        .search-box {
+            position: relative;
+        }
+        
+        .search-box input {
+            width: 100%;
+            max-width: 500px;
+            padding: 10px 80px 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+        
+        .search-box button {
+            position: absolute;
+            right: 5px;
+            top: 5px;
+            padding: 6px 15px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-width: 500px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .suggestion {
+            padding: 10px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .suggestion:hover {
+            background: #f5f5f5;
+        }
+        
+        #map {
+            position: absolute;
+            top: 85px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        
+        .btn-group {
+            position: absolute;
+            top: 95px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .control-btn {
+            padding: 10px 15px;
+            background: white;
+            border: 2px solid #2196F3;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #2196F3;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 13px;
+        }
+        
+        .control-btn:hover {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .btn-draw {
+            border-color: #FF9800;
+            color: #FF9800;
+        }
+        
+        .btn-draw:hover {
+            background: #FF9800;
+        }
+        
+        .btn-draw.active {
+            background: #FF9800;
+            color: white;
+        }
+        
+        .btn-undo {
+            border-color: #9C27B0;
+            color: #9C27B0;
+        }
+        
+        .btn-undo:hover {
+            background: #9C27B0;
+            color: white;
+        }
+        
+        .btn-finish {
+            border-color: #4CAF50;
+            color: #4CAF50;
+        }
+        
+        .btn-finish:hover {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-clear {
+            border-color: #f44336;
+            color: #f44336;
+        }
+        
+        .btn-clear:hover {
+            background: #f44336;
+            color: white;
+        }
+        
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            max-width: 300px;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .info-panel.show {
+            display: block;
+        }
+        
+        .info-panel h3 {
+            color: #2196F3;
+            margin-bottom: 8px;
+        }
+        
+        .info-panel button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .info-panel button:hover {
+            background: #1976D2;
+        }
+        
+        .btn-close {
+            background: #757575 !important;
+            margin-top: 5px;
+        }
+        
+        .draw-status {
+            position: absolute;
+            top: 95px;
+            left: 20px;
+            z-index: 1000;
+            background: #FF9800;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
 </head>
 <body>
-    <!-- Header -->
     <div class="header">
-        <h1>🗺️ Indoor Navigation System</h1>
+        <h1>🗺️ Draw Your Hallways - Click and Drag!</h1>
         <div class="search-box">
             <input 
                 type="text" 
                 id="searchInput" 
-                placeholder="Search for a location..."
+                placeholder="Search location..."
                 autocomplete="off"
             >
-            <button onclick="performSearch()">🔍 Search</button>
+            <button onclick="search()">🔍 Search</button>
             <div class="suggestions" id="suggestions"></div>
         </div>
     </div>
     
-    <!-- Controls -->
+    <div class="draw-status" id="drawStatus">
+        🖊️ DRAWING MODE - Click and drag to draw hallways
+    </div>
+    
     <div class="btn-group">
         <button class="control-btn" onclick="setCurrentLocation()">
             📍 Set My Location
         </button>
+        <button class="control-btn btn-draw" id="drawBtn" onclick="toggleDrawMode()">
+            🖊️ Draw Hallways
+        </button>
+        <button class="control-btn btn-undo" onclick="undoLastPath()">
+            ↩️ Undo Last Path
+        </button>
+        <button class="control-btn btn-clear" onclick="clearHallways()">
+            🗑️ Clear All
+        </button>
+        <button class="control-btn btn-finish" onclick="finishDrawing()">
+            ✅ Finish (<span id="pathCount">0</span>)
+        </button>
     </div>
     
-    <!-- Map Container -->
     <div id="map"></div>
     
-    <!-- Info Panel -->
     <div class="info-panel" id="infoPanel">
         <h3 id="locationName">Location</h3>
         <p id="locationDesc">Description</p>
@@ -43,19 +260,359 @@
         <button class="btn-close" onclick="closeInfo()">Close</button>
     </div>
     
-    <!-- External JavaScript - CORRECT ORDER IS CRITICAL -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- Data Files FIRST (these define LOCATIONS and CORRIDOR_WAYPOINTS) -->
-    <script src="js/data/locations.js"></script>
-    <script src="js/data/corridors.js"></script>
-    
-    <!-- Core Logic (pathfinding uses data, map uses pathfinding) -->
-    <script src="js/pathfinding.js"></script>
-    <script src="js/map.js"></script>
-    
-    <!-- Features (these use map, so must load AFTER map.js) -->
-    <script src="js/search.js"></script>
-    <script src="js/ui.js"></script>
+    <script>
+        const locations = {
+            'Main Entrance': {
+                pos: [820, 1695],
+                door: [1112, 1685],
+                description: 'Main building entrance'
+            },
+            'Conference Room': {
+                pos: [1992, 1955],
+                door: [1907, 2113],
+                description: 'Meeting and conference space'
+            },
+            'Computer Lab': {
+                pos: [1192, 3195],
+                door: [1069, 3106],
+                description: 'Computer lab with workstations'
+            },
+            'Study Area': {
+                pos: [696, 3243],
+                door: [808, 3094],
+                description: 'Quiet study space'
+            }
+        };
+        
+        const map = L.map('map', { 
+            crs: L.CRS.Simple,
+            minZoom: -2,
+            maxZoom: 4,
+            zoom: 0
+        });
+        
+        const bounds = [[0, 0], [3024, 4032]];
+        L.imageOverlay('blueprint.png', bounds).addTo(map);
+        map.fitBounds(bounds);
+        
+        let markers = {};
+        let selectedLocation = null;
+        let currentLocation = null;
+        let currentLocationMarker = null;
+        let routeLine = null;
+        let isDrawing = false;
+        let drawingMode = false;
+        let currentDrawingLine = null;
+        let drawnLines = [];
+        let corridorWaypoints = [];
+        
+        Object.entries(locations).forEach(([name, data]) => {
+            const marker = L.marker(data.pos).addTo(map);
+            marker.bindPopup(`<b>${name}</b><br>${data.description}`);
+            marker.on('click', () => {
+                if (!drawingMode) showInfo(name, data);
+            });
+            markers[name] = marker;
+            
+            L.circleMarker(data.door, {
+                radius: 5,
+                fillColor: '#4CAF50',
+                color: 'white',
+                weight: 2,
+                fillOpacity: 0.8
+            }).addTo(map).bindPopup(`🚪 Door to ${name}`);
+        });
+        
+        function toggleDrawMode() {
+            drawingMode = !drawingMode;
+            const btn = document.getElementById('drawBtn');
+            const status = document.getElementById('drawStatus');
+            
+            if (drawingMode) {
+                btn.classList.add('active');
+                status.style.display = 'block';
+                map.dragging.disable();
+            } else {
+                btn.classList.remove('active');
+                status.style.display = 'none';
+                map.dragging.enable();
+            }
+        }
+        
+        map.on('mousedown', function(e) {
+            if (!drawingMode) return;
+            
+            isDrawing = true;
+            const startPoint = [e.latlng.lat, e.latlng.lng];
+            
+            currentDrawingLine = L.polyline([startPoint], {
+                color: '#FF9800',
+                weight: 8,
+                opacity: 0.7
+            }).addTo(map);
+        });
+        
+        map.on('mousemove', function(e) {
+            if (!isDrawing || !currentDrawingLine) return;
+            
+            const newPoint = [e.latlng.lat, e.latlng.lng];
+            const latlngs = currentDrawingLine.getLatLngs();
+            latlngs.push(newPoint);
+            currentDrawingLine.setLatLngs(latlngs);
+        });
+        
+        map.on('mouseup', function(e) {
+            if (!isDrawing) return;
+            
+            isDrawing = false;
+            
+            if (currentDrawingLine) {
+                const points = currentDrawingLine.getLatLngs();
+                
+                if (points.length > 2) {
+                    drawnLines.push(currentDrawingLine);
+                    updatePathCount();
+                    console.log(`Path ${drawnLines.length} drawn with ${points.length} points`);
+                } else {
+                    map.removeLayer(currentDrawingLine);
+                }
+                
+                currentDrawingLine = null;
+            }
+        });
+        
+        function updatePathCount() {
+            const counter = document.getElementById('pathCount');
+            if (counter) {
+                counter.textContent = drawnLines.length;
+            }
+        }
+        
+        function undoLastPath() {
+            if (drawnLines.length === 0) {
+                alert('⚠️ No paths to undo!');
+                return;
+            }
+            
+            const lastLine = drawnLines.pop();
+            map.removeLayer(lastLine);
+            updatePathCount();
+            
+            console.log(`Undone! ${drawnLines.length} paths remaining`);
+        }
+        
+        function clearHallways() {
+            if (confirm('Clear all drawn hallways?')) {
+                drawnLines.forEach(line => map.removeLayer(line));
+                drawnLines = [];
+                corridorWaypoints = [];
+                updatePathCount();
+                console.log('All hallways cleared');
+            }
+        }
+        
+        function finishDrawing() {
+            if (drawnLines.length === 0) {
+                alert('⚠️ No hallways drawn yet!');
+                return;
+            }
+            
+            corridorWaypoints = [];
+            
+            drawnLines.forEach((line) => {
+                const points = line.getLatLngs();
+                
+                for (let i = 0; i < points.length; i++) {
+                    const point = points[i];
+                    corridorWaypoints.push([
+                        Math.round(point.lat),
+                        Math.round(point.lng)
+                    ]);
+                }
+            });
+            
+            corridorWaypoints = corridorWaypoints.filter((point, index, self) =>
+                index === self.findIndex(p => p[0] === point[0] && p[1] === point[1])
+            );
+            
+            console.log('\n========== HALLWAYS COMPLETE ==========');
+            console.log('Paths drawn:', drawnLines.length);
+            console.log('Waypoints generated:', corridorWaypoints.length);
+            console.log('\nCOPY THIS:\n');
+            console.log('const corridorWaypoints = ' + JSON.stringify(corridorWaypoints, null, 2) + ';');
+            console.log('\n=======================================\n');
+            
+            if (drawingMode) toggleDrawMode();
+            
+            alert(`✅ Complete!\n\n${drawnLines.length} paths\n${corridorWaypoints.length} waypoints\n\nCheck console (F12) to save.`);
+        }
+        
+        function distance(p1, p2) {
+            const dy = p2[0] - p1[0];
+            const dx = p2[1] - p1[1];
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+        
+        function findSmartPath(start, destinationName) {
+            if (corridorWaypoints.length === 0) {
+                return [start, locations[destinationName].pos];
+            }
+            
+            const destination = locations[destinationName];
+            const destDoor = destination.door;
+            const destPos = destination.pos;
+            
+            const path = [start];
+            
+            let nearestToStart = corridorWaypoints[0];
+            let minDist = distance(start, nearestToStart);
+            
+            corridorWaypoints.forEach(wp => {
+                const dist = distance(start, wp);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestToStart = wp;
+                }
+            });
+            
+            path.push(nearestToStart);
+            
+            let nearestToDoor = corridorWaypoints[0];
+            minDist = distance(destDoor, nearestToDoor);
+            
+            corridorWaypoints.forEach(wp => {
+                const dist = distance(destDoor, wp);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestToDoor = wp;
+                }
+            });
+            
+            if (nearestToDoor !== nearestToStart) {
+                path.push(nearestToDoor);
+            }
+            
+            path.push(destDoor);
+            path.push(destPos);
+            
+            return path;
+        }
+        
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsDiv = document.getElementById('suggestions');
+        
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            if (query.length < 2) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            const matches = Object.keys(locations).filter(name => 
+                name.toLowerCase().includes(query)
+            );
+            
+            if (matches.length > 0) {
+                suggestionsDiv.innerHTML = matches.map(name => 
+                    `<div class="suggestion" onclick="selectLocation('${name}')">${name}</div>`
+                ).join('');
+                suggestionsDiv.style.display = 'block';
+            } else {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+        
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') search();
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-box')) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+        
+        function search() {
+            const query = searchInput.value.trim().toLowerCase();
+            const found = Object.keys(locations).find(name => 
+                name.toLowerCase().includes(query)
+            );
+            
+            if (found) {
+                selectLocation(found);
+            }
+        }
+        
+        function selectLocation(name) {
+            const location = locations[name];
+            map.setView(location.pos, 2);
+            markers[name].openPopup();
+            showInfo(name, location);
+            suggestionsDiv.style.display = 'none';
+            searchInput.value = name;
+            selectedLocation = { name, ...location };
+        }
+        
+        function showInfo(name, data) {
+            document.getElementById('locationName').textContent = name;
+            document.getElementById('locationDesc').textContent = data.description;
+            document.getElementById('infoPanel').classList.add('show');
+            selectedLocation = { name, ...data };
+        }
+        
+        function closeInfo() {
+            document.getElementById('infoPanel').classList.remove('show');
+        }
+        
+        function setCurrentLocation() {
+            alert('Click where you are');
+            
+            map.once('click', function(e) {
+                currentLocation = [e.latlng.lat, e.latlng.lng];
+                
+                if (currentLocationMarker) {
+                    map.removeLayer(currentLocationMarker);
+                }
+                
+                currentLocationMarker = L.circleMarker(currentLocation, {
+                    radius: 12,
+                    fillColor: '#2196F3',
+                    color: 'white',
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                
+                currentLocationMarker.bindPopup('<b>📍 You are here</b>').openPopup();
+            });
+        }
+        
+        function navigateTo() {
+            if (!selectedLocation || !currentLocation) {
+                alert('Set location and select destination first!');
+                return;
+            }
+            
+            if (routeLine) {
+                map.removeLayer(routeLine);
+            }
+            
+            const smartPath = findSmartPath(currentLocation, selectedLocation.name);
+            
+            routeLine = L.polyline(smartPath, {
+                color: '#2196F3',
+                weight: 6,
+                opacity: 0.9,
+                dashArray: '15, 10'
+            }).addTo(map);
+            
+            map.fitBounds(smartPath, { padding: [80, 80], maxZoom: 2 });
+        }
+        
+        console.log('✅ Ready! Draw hallways then test navigation.');
+    </script>
 </body>
 </html>
+indexdrawlabel.txt
+20 KB
