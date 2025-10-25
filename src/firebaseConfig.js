@@ -1,10 +1,7 @@
-// Import only the functions we need
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously } from "firebase/auth";
 import { getFirestore, setLogLevel, doc, setDoc, onSnapshot } from "firebase/firestore";
 
-// --- !! IMPORTANT !! ---
-// PASTE YOUR FIREBASE CONFIG OBJECT FROM STEP 1 HERE
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -25,7 +22,6 @@ if (missingConfig.length > 0) {
       "Check that the variables are defined with a VITE_ prefix."
   );
 }
-// --- !! END OF CONFIG !! ---
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

@@ -21,36 +21,28 @@ lib-cov
 .nyc_output
 
 # Grunt intermediate storage (https://www.google.com/search?q=http://gruntjs.com/creating-plugins%23storing-intermediate-files)
-
 .grunt
 
 # Bower dependency directory (https://bower.io/)
-
 bower_components
 
 # node-waf configuration
-
 .lock-wscript
 
 # Compiled binary addons (http://nodejs.org/api/addons.html)
-
 build/Release
 
 # Dependency directories
-
 node_modules/
 jspm_packages/
 
 # Vite build output
-
 dist
 
 # Vite cache
-
 .vite
 
 # IDE files
-
 .idea
 .vscode
 *.suo

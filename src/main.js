@@ -1,6 +1,5 @@
-// Import from our new firebase config
+// --- Imports ---
 import { db, auth, graphDocRef, onSnapshot } from './firebaseConfig.js';
-// Import our new dijkstra module
 import { PriorityQueue, dijkstra } from './dijkstra.js';
 
 // --- App State ---

@@ -1,5 +1,3 @@
-// This file exports the pathfinding logic so it can be shared.
-
 export class PriorityQueue {
     constructor() { this.elements = []; }
     enqueue(element, priority) {
